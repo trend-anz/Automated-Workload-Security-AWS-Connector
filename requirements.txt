@@ -1,0 +1,2 @@
+deep-security-api
+boto3
