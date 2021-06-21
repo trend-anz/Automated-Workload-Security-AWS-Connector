@@ -47,7 +47,7 @@ def create_aws_connector(aws_account_id, display_name, cross_account_role_arn):
     )
 
     try:
-        o = api_instance.create_aws_connector(aws_connector, API_VERSON)
+        api_instance.create_aws_connector(aws_connector, API_VERSON)
         print("Done")
 
     except ApiException as e:

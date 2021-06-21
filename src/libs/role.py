@@ -4,8 +4,7 @@ from botocore.exceptions import ClientError
 
 
 ROLE_SESSION_NAME = "Workload_Security_Cross_Account_Creation_Session"
-NEW_ASSUME_ROLE_NAME = "Workload_Security_Role_Cross"
-NEW_ASSUME_ROLE_POLICY_NAME = "Workload_Security_Policy_Cross"
+
 
 TREND_WORKLOAD_SECURITY_POLICY = json.dumps(
     {
@@ -116,10 +115,15 @@ def _get_policy_arn(iam, new_assume_role_policy_name):
 
 
 def _create_trend_cross_account_role(
-    access_key_id, secrect_access_key, session_token, trend_assume_role_policy
+    access_key_id,
+    secrect_access_key,
+    session_token,
+    trend_assume_role_name,
+    trend_assume_role_policy_name,
+    trend_assume_role_policy,
 ):
     print(
-        f'Creating Trend cross-account role "{NEW_ASSUME_ROLE_NAME}" using retrieved credentials...'
+        f'Creating Trend cross-account role "{trend_assume_role_name}" using retrieved credentials...'
     )
 
     iam = boto3.client(
@@ -131,7 +135,7 @@ def _create_trend_cross_account_role(
 
     try:
         role = iam.create_role(
-            RoleName=NEW_ASSUME_ROLE_NAME,
+            RoleName=trend_assume_role_name,
             AssumeRolePolicyDocument=trend_assume_role_policy,
         )
 
@@ -140,13 +144,13 @@ def _create_trend_cross_account_role(
 
     except ClientError as e:
         if e.response["Error"]["Code"] == "EntityAlreadyExists":
-            role_arn = _get_role_arn(iam, NEW_ASSUME_ROLE_NAME)
+            role_arn = _get_role_arn(iam, trend_assume_role_name)
 
-    print(f'Creating cross-account policy "{NEW_ASSUME_ROLE_POLICY_NAME}"')
+    print(f'Creating cross-account policy "{trend_assume_role_policy_name}"')
 
     try:
         policy = iam.create_policy(
-            PolicyName=NEW_ASSUME_ROLE_POLICY_NAME,
+            PolicyName=trend_assume_role_policy_name,
             PolicyDocument=TREND_WORKLOAD_SECURITY_POLICY,
         )
 
@@ -155,12 +159,12 @@ def _create_trend_cross_account_role(
 
     except ClientError as e:
         if e.response["Error"]["Code"] == "EntityAlreadyExists":
-            policy_arn = _get_policy_arn(iam, NEW_ASSUME_ROLE_POLICY_NAME)
+            policy_arn = _get_policy_arn(iam, trend_assume_role_policy_name)
 
-    print(f'Attaching cross-account policy "{NEW_ASSUME_ROLE_POLICY_NAME}" to role')
+    print(f'Attaching cross-account policy "{trend_assume_role_policy_name}" to role')
 
     try:
-        iam.attach_role_policy(PolicyArn=policy_arn, RoleName=NEW_ASSUME_ROLE_NAME)
+        iam.attach_role_policy(PolicyArn=policy_arn, RoleName=trend_assume_role_name)
         print("Done")
 
     except ClientError as e:
@@ -176,6 +180,8 @@ def create_trend_cross_account_role(
     trend_external_id,
     aws_cross_account_role_name,
     customer_account_ids,
+    trend_assume_role_name,
+    trend_assume_role_policy_name,
 ):
     role_details = []
 
@@ -191,7 +197,12 @@ def create_trend_cross_account_role(
         )
 
         role_arn = _create_trend_cross_account_role(
-            access_key_id, secrect_access_key, session_token, trend_assume_role_policy
+            access_key_id,
+            secrect_access_key,
+            session_token,
+            trend_assume_role_name,
+            trend_assume_role_policy_name,
+            trend_assume_role_policy,
         )
 
         entry = {

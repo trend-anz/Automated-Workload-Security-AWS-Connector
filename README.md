@@ -69,3 +69,11 @@ Done
 Creating AWS Connector for "Account2" (222222222222). This may take a minute or two...
 Done
 ```
+
+## Customised names
+
+The default role and policy names can be changed using the following command:
+
+```
+python run.py <custom_role_name> <custom_policy_name> 
+```
