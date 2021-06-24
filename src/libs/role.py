@@ -68,7 +68,7 @@ def _get_trend_assume_role_policy(trend_aws_account_id, trend_external_id):
     return assume_role_policy
 
 
-def _get_child_account_keys(aws_cross_account_role_name, customer_account_id):
+def get_child_account_keys(aws_cross_account_role_name, customer_account_id):
     print(f"Asssuming role: {aws_cross_account_role_name}")
     sts = boto3.client("sts")
     response = sts.assume_role(
@@ -178,38 +178,26 @@ def _create_trend_cross_account_role(
 def create_trend_cross_account_role(
     trend_aws_account_id,
     trend_external_id,
-    aws_cross_account_role_name,
-    customer_account_ids,
     trend_assume_role_name,
     trend_assume_role_policy_name,
+    aws_cross_account_role_name,
+    account_id,
 ):
-    role_details = []
-
     trend_assume_role_policy = _get_trend_assume_role_policy(
         trend_aws_account_id, trend_external_id
     )
 
-    for customer_account_id in customer_account_ids:
-        print(f"Setting up account {customer_account_id}")
+    access_key_id, secrect_access_key, session_token = get_child_account_keys(
+        aws_cross_account_role_name, account_id
+    )
 
-        access_key_id, secrect_access_key, session_token = _get_child_account_keys(
-            aws_cross_account_role_name, customer_account_id
-        )
+    cross_account_role_arn = _create_trend_cross_account_role(
+        access_key_id,
+        secrect_access_key,
+        session_token,
+        trend_assume_role_name,
+        trend_assume_role_policy_name,
+        trend_assume_role_policy,
+    )
 
-        role_arn = _create_trend_cross_account_role(
-            access_key_id,
-            secrect_access_key,
-            session_token,
-            trend_assume_role_name,
-            trend_assume_role_policy_name,
-            trend_assume_role_policy,
-        )
-
-        entry = {
-            "aws_accont_id": customer_account_id,
-            "cross_account_role_arn": role_arn,
-        }
-
-        role_details.append(entry)
-
-    return role_details
+    return cross_account_role_arn

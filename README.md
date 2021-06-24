@@ -3,11 +3,14 @@
 Automates the deployment of Workload Security's AWS Connectors.  
 
 ## What does it do?
+### Workload Security
+The tool uses the `OrganizationAccountAccessRole` role to access your accounts. It then deploys a `Workload_Security_Role_Cross` role and `Workload_Security_Policy_Cross` policy into each of them. It then enables the Workload Security AWS connector for them.
 
-This tool uses the `OrganizationAccountAccessRole` role to access your accounts. It then creates a `Workload_Security_Role_Cross` role and `Workload_Security_Policy_Cross` policy. These enable Workload Security's AWS Connector to work.
+It then connects Workload Security to your AWS accounts. 
 
-The tool then connects Workload Security to your AWS accounts. 
+### Deep Security
 
+Using the `CrossAccountRole` role(s) specified in your CSV file, the tool connects Deep Security your AWS accounts.
 
 ## Usage
 
@@ -17,19 +20,32 @@ The tool then connects Workload Security to your AWS accounts.
    pip install --user -r requirements.txt
    ```
 
-2. Create a CSV in the `src` directory. 
-3. Enter `DisplayName` and `AccountNumber` details into the CSV file, like so:
+2. Create a CSV file in the `src` directory. 
+3. Create one of the following CSV files -
+
+   For Workload Security:
 
     ```
     DisplayName,AccountNumber
     Account1,111111111111
     Account2,222222222222
     ```
+
+   For Deep Security:
+
+   ```
+   DisplayName,AccountId,CrossAccountRoleArn
+   Account1,111111111111,arn:aws:iam::111111111111:role/DeepSecurityAccessRole
+   Account2,222222222222,arn:aws:iam::222222222222:role/DeepSecurityAccessRole
+   ```
+   
+   **Note:** The `CrossAccountRoleArn` roles must enable Deep Security to access these accounts. 
+
     The `AccountNumber` column specifies the AWS account numbers. The `DisplayName` column defines what the accounts will be called in Workload Security.
 
 4. Set the following environment variables:
    * `WS_KEY`: Deep Security API key
-   *  `DS_URL`: Address of the Deep Security server **(only required for on-prem installs - Not required for Workload Security)**
+   * `DS_URL`: API URL address for the Deep Security server **(only required for on-prem installs - Not required for Workload Security)**
 
 5. Execute the following command in your AWS master accont:
 
@@ -68,12 +84,4 @@ Creating AWS Connector for "Account1" (111111111111). This may take a minute or 
 Done
 Creating AWS Connector for "Account2" (222222222222). This may take a minute or two...
 Done
-```
-
-## Customised names
-
-The default role and policy names can be changed using the following command:
-
-```
-python run.py <custom_role_name> <custom_policy_name> 
 ```

@@ -1,9 +1,14 @@
+import os
 import sys
 import csv
 from time import sleep
 from libs.role import create_trend_cross_account_role
 from libs.ws import create_aws_connector, get_aws_external_id
 
+
+WORKLOAD_SECURITY_URL = "https://cloudone.trendmicro.com/api"
+DS_URL = os.environ.get("DS_URL", WORKLOAD_SECURITY_URL)
+WS_HOST = True if DS_URL == WORKLOAD_SECURITY_URL else False
 TREND_ASSUME_ROLE_NAME = "Workload_Security_Role_Cross"
 TREND_ASSUME_ROLE_POLICY_NAME = "Workload_Security_Policy_Cross"
 TREND_AWS_ACCOUNT_ID = "147995105371"
@@ -12,57 +17,57 @@ ACCOUNTS_CSV_FILENAME = "accounts.csv"
 SLEEP_TIME = 10
 
 
-def _get_role_name_policy_name():
-    if len(sys.argv) == 1:
-        return TREND_ASSUME_ROLE_NAME, TREND_ASSUME_ROLE_POLICY_NAME
-
-    elif len(sys.argv) == 2:
-        role_name = sys.argv[1]
-        return role_name, TREND_ASSUME_ROLE_POLICY_NAME
-
-    elif len(sys.argv) > 2:
-        role_name = sys.argv[1]
-        policy_name = sys.argv[2]
-        return role_name, policy_name
-
-
-def get_account_number_display_name_map():
-    account_number_display_name_map = {}
+def get_account_id_details_map():
+    account_id_details_map = {}
 
     with open(ACCOUNTS_CSV_FILENAME, "r") as f:
         csv_entries = csv.DictReader(f)
 
         for entry in csv_entries:
-            account_number = entry["AccountNumber"]
-            display_name = entry["DisplayName"]
-            account_number_display_name_map[account_number] = display_name
+            account_id = entry["AccountId"]
 
-    return account_number_display_name_map
+            # Error out if no role name is provided for DS.
+            # When run for WS, the role gets populated dynamically.
+            ds_cross_account_role = entry.get("CrossAccountRoleArn", '')
+            if not WS_HOST and not ds_cross_account_role:
+                sys.exit('Error: The CSV file requies the "CrossAccountRoleArn" column.')
+
+            account_id_details_map[account_id] = {
+                'DisplayName': entry["DisplayName"],
+                'CrossAccountRoleArn': ds_cross_account_role,
+            }
+
+    return account_id_details_map
 
 
 def main():
-    account_number_display_name_map = get_account_number_display_name_map()
-    account_numbers = list(account_number_display_name_map.keys())
-    trend_external_id = get_aws_external_id()
-    trend_assume_role_name, trend_assume_role_policy_name = _get_role_name_policy_name()
+    # Read the CSV file into a dict
+    account_id_details_map = get_account_id_details_map()
 
-    role_details = create_trend_cross_account_role(
-        TREND_AWS_ACCOUNT_ID,
-        trend_external_id,
-        AWS_CROSS_ACCOUNT_ROLE_NAME,
-        account_numbers,
-        trend_assume_role_name,
-        trend_assume_role_policy_name,
-    )
+    # If using Workload Security, create a cross-account role in each account.
+    if WS_HOST:
+        trend_external_id = get_aws_external_id()
 
-    print(f"Sleeping for {SLEEP_TIME} seconds to enable AWS policies to take effect...")
-    sleep(SLEEP_TIME)
+        for account_id in account_id_details_map:
+            cross_account_role_arn = create_trend_cross_account_role(
+                TREND_AWS_ACCOUNT_ID,
+                trend_external_id,
+                TREND_ASSUME_ROLE_NAME,
+                TREND_ASSUME_ROLE_POLICY_NAME,
+                AWS_CROSS_ACCOUNT_ROLE_NAME,
+                account_id,
+            )
 
-    for details in role_details:
-        aws_account_id = details["aws_accont_id"]
-        cross_account_role_arn = details["cross_account_role_arn"]
-        account_alias = account_number_display_name_map[aws_account_id]
-        create_aws_connector(aws_account_id, account_alias, cross_account_role_arn)
+            account_id_details_map[account_id]['CrossAccountRoleArn'] = cross_account_role_arn
+
+        print(f"Sleeping for {SLEEP_TIME} seconds to enable AWS policies to take effect...")
+        sleep(SLEEP_TIME)
+
+    print('Rolling out the AWS connectors...')
+    for account_id, account_details in account_id_details_map.items():
+        cross_account_role_arn = account_details["CrossAccountRoleArn"]
+        display_name = account_details['DisplayName']
+        create_aws_connector(account_id, display_name, cross_account_role_arn)
 
 
 if __name__ == "__main__":
